@@ -17,35 +17,35 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 ### 1. Récupérer le secret JWT d'OnlyOffice
 ```bash
-docker exec nextcloud-onlyoffice /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'
+docker exec nextcloud /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'
 ```
 
 **Note :** Conservez ce secret pour l'étape 4.
 
 ### 2. Installer l'application OnlyOffice dans Nextcloud
 ```bash
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ app:install onlyoffice"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install onlyoffice"
 ```
 
 ### 3. Configurer l'URL du serveur OnlyOffice
 ```bash
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ config:app:set onlyoffice DocumentServerUrl --value='http://documentserver/'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice DocumentServerUrl --value='http://documentserver/'"
 ```
 
 ### 4. Configurer le secret JWT
 ```bash
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ config:app:set onlyoffice jwt_secret --value='super-secret-jwt-2024-change-me'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice jwt_secret --value='super-secret-jwt-2024-change-me'"
 ```
 
 > ⚠️ **Important :** Remplacez `super-secret-jwt-2024-change-me` par le secret récupéré à l'étape 1.
 
 ### 5. Activer OnlyOffice comme éditeur par défaut
 ```bash
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ config:app:set onlyoffice defFormats --value='{\"docx\":true,\"xlsx\":true,\"pptx\":true}'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice defFormats --value='{\"docx\":true,\"xlsx\":true,\"pptx\":true}'"
 ```
 ### 6. Activer Draw.io 
 ```bash 
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ app:install drawio"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install drawio"
 ```
 
 ## Vérification
@@ -83,5 +83,5 @@ Assurez-vous que le secret JWT est identique dans :
 
 Consultez les logs du serveur documentserver :
 ```bash
-docker logs nextcloud-onlyoffice
+docker logs nextcloud
 ```
