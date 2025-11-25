@@ -1,7 +1,6 @@
-version: "3.8"
-
 services:
   nginx:
+    container_name: nextcloud-nginx
     image: nginx:alpine
     restart: unless-stopped
     ports:
@@ -17,6 +16,7 @@ services:
       - nextcloud
 
   db:
+    container_name: nextcloud-db
     image: postgres:16
     restart: unless-stopped
     environment:
@@ -29,6 +29,7 @@ services:
       - nextcloud
 
   redis:
+    container_name: nextcloud-redis
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -38,6 +39,7 @@ services:
       - nextcloud
 
   nextcloud:
+    container_name: nextcloud
     build:
       context: .
       dockerfile: Dockerfile
@@ -66,6 +68,7 @@ services:
       - nextcloud
 
   documentserver:
+    container_name: nextcloud-onlyoffice
     image: onlyoffice/documentserver:latest
     restart: unless-stopped
     depends_on:
@@ -78,6 +81,8 @@ services:
       - JWT_SECRET=super-secret-jwt-2024-change-me
       - JWT_HEADER=Authorization
       - USE_UNAUTHORIZED_STORAGE=false
+    extra_hosts:
+      - "nextcloud.local:172.18.0.5"
     networks:
       - nextcloud
 
