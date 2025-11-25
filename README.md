@@ -7,6 +7,14 @@
 
 ## Installation et configuration
 
+### Création du certificat SSL a mettre dans le dossier ssl/ 
+```bash 
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout ./ssl/nextcloud.key \
+  -out ./ssl/nextcloud.crt \
+  -subj "/C=FR/ST=IDF/L=Paris/O=HomeServer/CN=nextcloud.local"
+```
+
 ### 1. Récupérer le secret JWT d'OnlyOffice
 ```bash
 docker exec nextcloud-ldap-cert-documentserver-1 /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'
