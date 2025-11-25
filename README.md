@@ -48,6 +48,33 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffi
 docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install drawio"
 ```
 
+
+## Erreur possible après l'exécution de ces commandes :
+![alt text](image.png)
+![alt text](image-1.png)
+
+### Explication de l'erreur d'intégrité : 
+Les erreurs d'intégrité qu'on vois sont normal. Voici pourquoi :
+
+OnlyOffice et Draw.io modifient légitimement mimetypelist.js pour ajouter leurs types de fichiers supportés (.docx, .xlsx, .pptx, .drawio, etc.)
+Les fichiers SVG (drawio.svg, dwb.svg) sont des icônes ajoutées par l'app Draw.io
+
+C'est le comportement standard de ces applications officielles.
+### Comment voir les versions de nos logiciels installés : 
+``` bash 
+docker exec nextcloud su -s /bin/sh www-data -c "php occ app:list --output=json" | jq '.enabled'
+```
+
+#### Modifications légitimes attendues
+- `core/js/mimetypelist.js` : Modifié par OnlyOffice + Draw.io
+- `core/img/filetypes/drawio.svg` : Icône Draw.io
+- `core/img/filetypes/dwb.svg` : Icône Draw.io
+
+#### Apps installées modifiant les fichiers core
+- onlyoffice v9.8.0
+- drawio v3.0.9
+
+Date dernière vérification : 25 nov 2025
 ## Vérification
 
 ### Via l'interface web
