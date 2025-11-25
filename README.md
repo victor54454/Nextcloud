@@ -17,7 +17,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 
 ### 1. Récupérer le secret JWT d'OnlyOffice
 ```bash
-docker exec nextcloud /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'
+docker exec nextcloud-onlyoffice  /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'
 ```
 
 **Note :** Conservez ce secret pour l'étape 4.
