@@ -50,8 +50,8 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install drawio"
 
 
 ## Erreur possible après l'exécution de ces commandes :
-![alt text](image.png)
-![alt text](image-1.png)
+![alt text](/photo/image.png)
+![alt text](/photo/image-1.png)
 
 ### Explication de l'erreur d'intégrité : 
 Les erreurs d'intégrité qu'on vois sont normal. Voici pourquoi :
