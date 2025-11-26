@@ -1,13 +1,13 @@
 FROM nextcloud:29-fpm-alpine
 
-# Copier le certificat LDAP
+# CERTIFICAT LDAPS
 COPY ./ldap-cert.cer /usr/local/share/ca-certificates/ad-ldap.crt
 
-# Installer le certificat et ldap-utils
+# CERTIFICAT
 RUN apk add --no-cache openldap-clients curl ca-certificates && \
     update-ca-certificates
 
-# Copier le script d'entrypoint personnalisé
+# SCRIPT
 COPY entrypoint-custom.sh /usr/local/bin/entrypoint-custom.sh
 RUN chmod +x /usr/local/bin/entrypoint-custom.sh
 
