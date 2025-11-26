@@ -75,6 +75,67 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ app:list --output=json"
 - drawio v3.0.9
 
 Date dernière vérification : 25 nov 2025
+
+## Ajout du LDAPS en invite de commande : 
+```bash 
+SUPPRIMER UNE CONF LDAPS
+# Supprime la config s01
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:delete-config s01"
+
+# Vide le cache
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:invalidate-cache"
+
+# Vérifie qu'il ne reste rien
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:show-config"
+
+NEWS CONFIG 
+
+# Crée une nouvelle config
+docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ ldap:create-empty-config"
+
+# Configure le serveur LDAPS
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapHost 'ldaps://192.168.10.28'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapPort 636"
+
+# Credentials du compte de service
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapAgentName 'CN=svc_nextcloud,CN=Users,DC=lab,DC=local'"
+LDAP_PASSWORD='NextCloud@2024!Service'
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapAgentPassword '$LDAP_PASSWORD'"
+
+# Base DN
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapBase 'DC=lab,DC=local'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapBaseUsers 'DC=lab,DC=local'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapBaseGroups 'DC=lab,DC=local'"
+
+# Désactive la vérification SSL
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 turnOffCertCheck 1"
+
+# Filtres (version PROPRE et SIMPLE)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapUserFilter '(&(objectClass=user)(sAMAccountName=*)(!(objectClass=computer))(!(sAMAccountName=krbtgt)))'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapLoginFilter '(&(objectClass=user)(sAMAccountName=%uid))'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapGroupFilter '(objectClass=group)'"
+
+# Attributs de mapping
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapExpertUsernameAttr 'sAMAccountName'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapUserDisplayName 'displayName'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapEmailAttribute 'mail'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapGroupDisplayName 'cn'"
+
+# Active la configuration
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapConfigurationActive 1"
+
+TEST 
+# Teste la connexion
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:test-config s01"
+
+# Recherche tous les utilisateurs
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:search ''"
+
+# Liste les utilisateurs dans Nextcloud
+docker exec nextcloud su -s /bin/sh www-data -c "php occ user:list"
+```
+
+
 ## Vérification
 
 ### Via l'interface web
