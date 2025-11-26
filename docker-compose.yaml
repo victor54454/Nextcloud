@@ -80,7 +80,7 @@ services:
       - JWT_ENABLED=true
       - JWT_SECRET=super-secret-jwt-2024-change-me
       - JWT_HEADER=Authorization
-      - USE_UNAUTHORIZED_STORAGE=false
+      - USE_UNAUTHORIZED_STORAGE=true    # refus des URLs avec certificats SSL auto-signés /  URLs en HTTP non chiffré  /  Sources non vérifiées
     extra_hosts:
       - "nextcloud.local:172.18.0.5"
     networks:

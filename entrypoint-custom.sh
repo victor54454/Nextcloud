@@ -3,11 +3,10 @@ set -e
 
 echo "Démarrage de Nextcloud"
 
-# Lancer l'entrypoint original qui va installer automatiquement
+# Lancer l'entrypoint de nextcloud 
 /entrypoint.sh php-fpm &
 FPM_PID=$!
 
-# Attendre que Nextcloud soit installé
 sleep 20
 
 # Vérifier si installé
@@ -52,5 +51,6 @@ if su -s /bin/sh www-data -c "php /var/www/html/occ status" 2>/dev/null | grep -
     fi
 else
     echo "Nextcloud pas encore installé"
+fi
 
 wait $FPM_PID
