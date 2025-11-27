@@ -192,6 +192,15 @@ Il faut cliqué sur **Applications** une fois ici il faut aller :
 ![alt text](/photo/image6.png)
 Dans **Pack d'applications** et la vous pourrais trouver bon nombre d'option comme celle citée plus haut. 
 
+
+## Installation de l'application S3 dans NextCloud :
+```bash
+# Installe l'app files_external (stockage externe)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install files_external"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ app:enable files_external" 
+```
+
+
 ## Vérification
 
 ### Via l'interface web
