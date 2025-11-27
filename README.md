@@ -91,7 +91,7 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:show-config"
 NEWS CONFIG 
 
 # Crée une nouvelle config
-docker exec nextcloud-onlyoffice su -s /bin/sh www-data -c "php occ ldap:create-empty-config"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:create-empty-config"
 
 # Configure le serveur LDAPS
 docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapHost 'ldaps://192.168.10.28'"
@@ -135,6 +135,62 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:search ''"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ user:list"
 ```
 
+## Synchro des groupes crée dans l'AD : 
+![alt text](/photo/image3.png)
+
+Comme on peut le voir sur la photo les groupes que j'ai crée dans l'AD sont remonter dans mon NextCloud. 
+Pour se faire il faut intervenir sur un container en particulier sui est le container NextCloud : 
+```bash 
+# Configure l'attribut de membership des groupes (pour Active Directory)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapGroupMemberAssocAttr 'member'"
+
+# Active la nested groups (groupes imbriqués) si tu en as
+docker exec nextcloud su -s /bin/sh www-data -c "php occ ldap:set-config s01 ldapNestedGroups 1"
+
+# Force une synchro
+docker exec nextcloud su -s /bin/sh www-data -c "php occ group:list"
+```
+
+## Gestion de sécuritée sur la création des users dans le NextCloud : 
+```bash
+# Désactive le backend de base de données (comptes locaux)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set user_ldap disable_db_backend --value=1"
+```
+
+## Gestion des paramètres du serveur ONLYOFFICE : 
+Dans cette partie nous allons configurais cette partie du serveur NextCloud : 
+![alt text](/photo/image4.png)
+Nous allons voir comment cela peut ce configurais directement depuis l'invite de commande : 
+```bash 
+# Adresse publique OnlyOffice (HTTPS)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice DocumentServerUrl --value='https://nextcloud.local/onlyoffice/'"
+
+# Adresse interne OnlyOffice
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice DocumentServerInternalUrl --value='http://documentserver/'"
+
+# Adresse serveur pour OnlyOffice (callback)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice StorageUrl --value='http://nginx/'"
+
+# JWT Secret
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice jwt_secret --value='super-secret-jwt-2024-change-me'"
+
+# JWT Header
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice jwt_header --value='Authorization'"
+
+# Désactiver vérification SSL
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:app:set onlyoffice verify_peer_off --value='true'"
+
+# Vérifier la config
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:list onlyoffice"
+```
+> ⚠️ **Important :** À noter, il faut prendre en compte que le nextcloud que j'ai monté et monté avec un certificat autosignée donc ce paramétrage permet de le faire fonctionner en ayant ce certificat. Sachant qu'avec un vrai certificat qui est valide nous allons rencontrer beaucoup moins de problèmes voire aucun, comme nextCloud n'aime pas forcément les certificats autosignés. 
+
+## Information : 
+Si on veut ajouter des application comme LDAP ou le groupe folder pour faire des dossier partager avec des groupes ou des users il faut ce rendre ici : 
+![alt text](/photo/image5.png)
+Il faut cliqué sur **Applications** une fois ici il faut aller : 
+![alt text](/photo/image6.png)
+Dans **Pack d'applications** et la vous pourrais trouver bon nombre d'option comme celle citée plus haut. 
 
 ## Vérification
 
