@@ -2,7 +2,6 @@ FROM nextcloud:29-fpm-alpine
 
 # CERTIFICAT LDAPS
 COPY ./ldap-cert.cer /usr/local/share/ca-certificates/ad-ldap.crt
-
 # CERTIFICAT
 RUN apk add --no-cache openldap-clients curl ca-certificates && \
     update-ca-certificates

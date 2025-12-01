@@ -3,24 +3,24 @@ services:
     container_name: minio
     image: minio/minio:RELEASE.2025-01-20T14-49-07Z
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":9001" --certs-dir /certs
     ports:
-      - "9000:9000"   # API S3
+      - "9000:9000"   # API S3 (HTTPS)
       - "9001:9001"   # Console Web
     environment:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin_secure_2024
     volumes:
       - minio_data:/data
+      - ./minio-certs:/certs:ro
     networks:
       - nextcloud
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-k", "https://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
 
-  # Service pour créer le bucket
   minio-client:
     container_name: minio-client
     image: minio/mc:latest
@@ -28,10 +28,47 @@ services:
       - minio
     entrypoint: >
       /bin/sh -c "
-      sleep 10;
-      mc alias set myminio http://minio:9000 minioadmin minioadmin_secure_2024;
-      mc mb myminio/nextcloud --ignore-existing;
-      mc anonymous set none myminio/nextcloud;
+      sleep 15;
+      mc alias set myminio https://minio:9000 minioadmin minioadmin_secure_2024 --insecure;
+      mc mb myminio/nextcloud --ignore-existing --insecure;
+      mc anonymous set none myminio/nextcloud --insecure;
+      
+      # Crée l'utilisateur service
+      mc admin user add myminio nextcloud-service 'NextcloudMinIO\$ecure2024!' --insecure;
+      
+      # Crée la policy
+      cat > /tmp/nextcloud-policy.json <<EOF
+      {
+        \"Version\": \"2012-10-17\",
+        \"Statement\": [
+          {
+            \"Effect\": \"Allow\",
+            \"Action\": [
+              \"s3:ListBucket\",
+              \"s3:GetBucketLocation\",
+              \"s3:ListBucketMultipartUploads\"
+            ],
+            \"Resource\": [\"arn:aws:s3:::nextcloud\"]
+          },
+          {
+            \"Effect\": \"Allow\",
+            \"Action\": [
+              \"s3:GetObject\",
+              \"s3:PutObject\",
+              \"s3:DeleteObject\",
+              \"s3:ListMultipartUploadParts\",
+              \"s3:AbortMultipartUpload\"
+            ],
+            \"Resource\": [\"arn:aws:s3:::nextcloud/*\"]
+          }
+        ]
+      }
+      EOF
+      
+      mc admin policy create myminio nextcloud-policy /tmp/nextcloud-policy.json --insecure;
+      mc admin policy attach myminio nextcloud-policy --user=nextcloud-service --insecure;
+      
+      echo '✅ Utilisateur nextcloud-service créé avec droits restreints';
       exit 0;
       "
     networks:

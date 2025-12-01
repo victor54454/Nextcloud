@@ -200,6 +200,98 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install files_exter
 docker exec nextcloud su -s /bin/sh www-data -c "php occ app:enable files_external" 
 ```
 
+## Configurer le TLS/SSL pour Minio 
+```bash 
+# Crée un dossier pour les certificats MinIO
+mkdir -p ~/travail/Nextcloud/minio-certs
+
+# Génère un certificat auto-signé (ou utilise Let's Encrypt en prod)
+openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+  -keyout ~/travail/Nextcloud/minio-certs/private.key \
+  -out ~/travail/Nextcloud/minio-certs/public.crt \
+  -subj "/C=FR/ST=IDF/L=Paris/O=EntrepriseXYZ/CN=minio.internal.local" \
+  -addext "subjectAltName=DNS:minio,DNS:minio.internal.local,IP:127.0.0.1"
+
+# Change les permissions
+chmod 600 ~/travail/Nextcloud/minio-certs/private.key
+chmod 644 ~/travail/Nextcloud/minio-certs/public.crt
+```
+
+## Copie le certificat de Minio dans NextCloud : 
+```bash
+# Copie le certificat public de MinIO dans le conteneur Nextcloud
+docker cp ~/travail/Nextcloud/minio-certs/public.crt nextcloud:/usr/local/share/ca-certificates/minio.crt
+
+# Mets à jour les certificats CA
+docker exec nextcloud update-ca-certificates
+```
+
+## Configuration de NextCloud avec TLS et utilisateur dédier 
+```bash
+ # Mode maintenance
+docker exec nextcloud su -s /bin/sh www-data -c "php occ maintenance:mode --on"
+
+# Configure MinIO avec TLS et utilisateur service
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore class --value='\\OC\\Files\\ObjectStore\\S3'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments bucket --value='nextcloud'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments autocreate --value=false --type=boolean"
+
+# 🔐 UTILISATEUR SERVICE DÉDIÉ (pas root)
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments key --value='nextcloud-service'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments secret --value='NextcloudMinIO\$ecure2024!'"
+
+# 🔒 TLS ACTIVÉ
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments hostname --value='minio'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments port --value=9000 --type=integer"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments use_ssl --value=true --type=boolean"  # ⬅️ HTTPS
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments region --value='us-east-1'"
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments use_path_style --value=true --type=boolean"
+
+# Redémarre
+docker restart nextcloud
+sleep 30
+
+# Fin maintenance
+docker exec nextcloud su -s /bin/sh www-data -c "php occ maintenance:mode --off"
+```
+
+## Vérification du S3 : 
+```bash 
+# 1. Vérifie la config
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:list system" | grep -A20 objectstore
+
+# 2. Teste la connexion HTTPS vers MinIO
+docker exec nextcloud curl -I https://minio:9000/minio/health/live
+
+# 3. Vérifie les logs MinIO
+docker logs minio --tail 50
+
+# 4. Test upload dans Nextcloud
+# → Upload un fichier via l'interface web
+
+# 5. Vérifie dans MinIO que le fichier est arrivé
+docker exec minio mc ls myminio/nextcloud/ --insecure
+```
+
+### Qu'elle que bonne pratique qui peuvent être mît en place : 
+
+Nous pouvons faire des rotations de changment de mot de passe tout les 90 jours : 
+```bash
+ # Tous les 90 jours, change le mot de passe
+mc admin user disable myminio nextcloud-service
+mc admin user add myminio nextcloud-service NewPasswordHere2024!
+# Puis mets à jour Nextcloud
+```
+Nous pouvons aussi mettre en place des métriques Prometheus sur Minio 
+```yaml
+environment:
+  - MINIO_PROMETHEUS_AUTH_TYPE=public
+```
+Nous pouvons aussi faire des backup régulier de notre config.php 
+```bash
+ # Backup régulier du config.php
+docker exec nextcloud cat /var/www/html/config/config.php > config.php.backup
+```
 
 ## Vérification
 

@@ -7,7 +7,16 @@ echo "Démarrage de Nextcloud"
 /entrypoint.sh php-fpm &
 FPM_PID=$!
 
-sleep 20
+# ✅ ATTENTE ACTIVE au lieu de sleep fixe
+echo "Attente du démarrage de Nextcloud..."
+for i in $(seq 1 60); do
+    if su -s /bin/sh www-data -c "php /var/www/html/occ status" 2>/dev/null | grep -q "installed: true"; then
+        echo "✅ Nextcloud est prêt !"
+        break
+    fi
+    echo "⏳ Tentative $i/60..."
+    sleep 5
+done
 
 # Vérifier si installé
 if su -s /bin/sh www-data -c "php /var/www/html/occ status" 2>/dev/null | grep -q "installed: true"; then
@@ -50,7 +59,7 @@ if su -s /bin/sh www-data -c "php /var/www/html/occ status" 2>/dev/null | grep -
         echo "Optimisations déjà appliquées"
     fi
 else
-    echo "Nextcloud pas encore installé"
+    echo "❌ Nextcloud pas encore installé après 5 minutes d'attente"
 fi
 
 wait $FPM_PID
