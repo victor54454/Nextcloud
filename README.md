@@ -188,9 +188,10 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ config:list onlyoffice"
 ## Information : 
 Si on veut ajouter des application comme LDAP ou le groupe folder pour faire des dossier partager avec des groupes ou des users il faut ce rendre ici : 
 ![alt text](/photo/image5.png)
-Il faut cliqué sur **Applications** une fois ici il faut aller : 
+ 
 ![alt text](/photo/image6.png)
-Dans **Pack d'applications** et la vous pourrais trouver bon nombre d'option comme celle citée plus haut. 
+
+Il faut cliqué sur **Applications** une fois ici il faut aller : Dans **Pack d'applications** et la vous pourrais trouver bon nombre d'option comme celle citée plus haut. 
 
 
 ## Installation de l'application S3 dans NextCloud :
@@ -200,97 +201,101 @@ docker exec nextcloud su -s /bin/sh www-data -c "php occ app:install files_exter
 docker exec nextcloud su -s /bin/sh www-data -c "php occ app:enable files_external" 
 ```
 
-## Configurer le TLS/SSL pour Minio 
+### Création des certificats auto signée : 
 ```bash 
-# Crée un dossier pour les certificats MinIO
-mkdir -p ~/travail/Nextcloud/minio-certs
-
-# Génère un certificat auto-signé (ou utilise Let's Encrypt en prod)
+# Crée les certificats
 openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
-  -keyout ~/travail/Nextcloud/minio-certs/private.key \
-  -out ~/travail/Nextcloud/minio-certs/public.crt \
-  -subj "/C=FR/ST=IDF/L=Paris/O=EntrepriseXYZ/CN=minio.internal.local" \
-  -addext "subjectAltName=DNS:minio,DNS:minio.internal.local,IP:127.0.0.1"
+  -keyout ~/travail/Nextcloud/minio-certs/certs/private.key \
+  -out ~/travail/Nextcloud/minio-certs/certs/public.crt \
+  -subj "/C=FR/ST=IDF/L=Paris/O=EntrepriseXYZ/CN=minio" \
+  -addext "subjectAltName=DNS:minio,DNS:localhost,IP:127.0.0.1"
 
-# Change les permissions
-chmod 600 ~/travail/Nextcloud/minio-certs/private.key
-chmod 644 ~/travail/Nextcloud/minio-certs/public.crt
+# Permissions
+chmod 600 ~/travail/Nextcloud/minio-certs/certs/private.key
+chmod 644 ~/travail/Nextcloud/minio-certs/certs/public.crt
+```
+### Création du Bucket dans Minio
+Configure l'alias 
+```bash 
+docker exec minio mc alias set myminio https://localhost:9000 minioadmin minioadmin_secure_2024 --insecure
+```
+Crée le bucket
+```bash 
+docker exec minio mc mb myminio/nextcloud --ignore-existing --insecure
+```
+Rend le bucket privé
+```bash 
+docker exec minio mc anonymous set none myminio/nextcloud --insecure
+```
+Crée l'utilisateur service
+```bash 
+docker exec minio mc admin user add myminio nextcloud-service NextcloudMinIOSecure2024 --insecure
+```
+Crée la policy
+```bash 
+docker exec minio sh -c "cat > /tmp/nextcloud-policy.json <<'EOF'
+{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:ListBucket\", \"s3:GetBucketLocation\", \"s3:ListBucketMultipartUploads\"],
+      \"Resource\": [\"arn:aws:s3:::nextcloud\"]
+    },
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:GetObject\", \"s3:PutObject\", \"s3:DeleteObject\", \"s3:ListMultipartUploadParts\", \"s3:AbortMultipartUpload\"],
+      \"Resource\": [\"arn:aws:s3:::nextcloud/*\"]
+    }
+  ]
+}
+EOF"
+```
+Applique la policy
+```bash 
+docker exec minio mc admin policy create myminio nextcloud-policy /tmp/nextcloud-policy.json --insecure
+```
+Attache la policy à l'utilisateur
+```bash 
+docker exec minio mc admin policy attach myminio nextcloud-policy --user=nextcloud-service --insecure
+```
+✅ VÉRIFIE QUE TOUT EST OK
+```bash 
+docker exec minio mc admin user info myminio nextcloud-service --insecure
 ```
 
-## Copie le certificat de Minio dans NextCloud : 
+## Configuration de Nextcloud avec Minio 
 ```bash
-# Copie le certificat public de MinIO dans le conteneur Nextcloud
-docker cp ~/travail/Nextcloud/minio-certs/public.crt nextcloud:/usr/local/share/ca-certificates/minio.crt
+# 1. Copie le certificat MinIO dans Nextcloud
+docker cp ~/travail/Nextcloud/minio-certs/certs/public.crt nextcloud:/usr/local/share/ca-certificates/minio.crt
 
-# Mets à jour les certificats CA
+# 2. Update les certificats CA
 docker exec nextcloud update-ca-certificates
-```
 
-## Configuration de NextCloud avec TLS et utilisateur dédier 
-```bash
- # Mode maintenance
+# 3. Mode maintenance
 docker exec nextcloud su -s /bin/sh www-data -c "php occ maintenance:mode --on"
 
-# Configure MinIO avec TLS et utilisateur service
+# 4. Configure objectstore
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore class --value='\\OC\\Files\\ObjectStore\\S3'"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments bucket --value='nextcloud'"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments autocreate --value=false --type=boolean"
-
-# 🔐 UTILISATEUR SERVICE DÉDIÉ (pas root)
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments key --value='nextcloud-service'"
-docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments secret --value='NextcloudMinIO\$ecure2024!'"
-
-# 🔒 TLS ACTIVÉ
+docker exec nextcloud su -s /bin/sh www-data -c 'php occ config:system:set objectstore arguments secret --value="NextcloudMinIOSecure2024"'
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments hostname --value='minio'"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments port --value=9000 --type=integer"
-docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments use_ssl --value=true --type=boolean"  # ⬅️ HTTPS
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments use_ssl --value=true --type=boolean"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments region --value='us-east-1'"
 docker exec nextcloud su -s /bin/sh www-data -c "php occ config:system:set objectstore arguments use_path_style --value=true --type=boolean"
 
-# Redémarre
+# 5. Redémarre Nextcloud
 docker restart nextcloud
 sleep 30
 
-# Fin maintenance
+# 6. Désactive maintenance
 docker exec nextcloud su -s /bin/sh www-data -c "php occ maintenance:mode --off"
-```
 
-## Vérification du S3 : 
-```bash 
-# 1. Vérifie la config
-docker exec nextcloud su -s /bin/sh www-data -c "php occ config:list system" | grep -A20 objectstore
-
-# 2. Teste la connexion HTTPS vers MinIO
-docker exec nextcloud curl -I https://minio:9000/minio/health/live
-
-# 3. Vérifie les logs MinIO
-docker logs minio --tail 50
-
-# 4. Test upload dans Nextcloud
-# → Upload un fichier via l'interface web
-
-# 5. Vérifie dans MinIO que le fichier est arrivé
-docker exec minio mc ls myminio/nextcloud/ --insecure
-```
-
-### Qu'elle que bonne pratique qui peuvent être mît en place : 
-
-Nous pouvons faire des rotations de changment de mot de passe tout les 90 jours : 
-```bash
- # Tous les 90 jours, change le mot de passe
-mc admin user disable myminio nextcloud-service
-mc admin user add myminio nextcloud-service NewPasswordHere2024!
-# Puis mets à jour Nextcloud
-```
-Nous pouvons aussi mettre en place des métriques Prometheus sur Minio 
-```yaml
-environment:
-  - MINIO_PROMETHEUS_AUTH_TYPE=public
-```
-Nous pouvons aussi faire des backup régulier de notre config.php 
-```bash
- # Backup régulier du config.php
-docker exec nextcloud cat /var/www/html/config/config.php > config.php.backup
+# 7. ✅ VÉRIFIE la config
+docker exec nextcloud su -s /bin/sh www-data -c "php occ config:list system" | grep -A20 objectstore 
 ```
 
 ## Vérification
